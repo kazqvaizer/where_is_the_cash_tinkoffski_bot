@@ -1,12 +1,10 @@
 import logging
-import os
-import stat
 import time
 
 import requests
 import sentry_sdk
 from envparse import env
-from telegram import Bot, ParseMode
+from telegram import Bot, ParseMode, TelegramError
 
 from models import CashRemain, Chat, db
 
@@ -19,17 +17,7 @@ logging.basicConfig(
 sentry_sdk.init(env("SENTRY_DSN", default=None))
 
 bot = Bot(token=env("TELEGRAM_BOT_TOKEN"))
-socket = env('DOCKER_SOCK', default='/var/run/docker.sock')
 currency = "USD"
-
-
-def validate_socket():
-    """Validate if we have access to the socket, die otherwise"""
-    mode = os.stat(socket).st_mode
-
-    assert stat.S_ISSOCK(mode)
-
-    logging.log(logging.DEBUG, socket)
 
 
 def get_clusters():
@@ -111,11 +99,13 @@ def make_diff_message(before: dict, after: dict) -> str:
 
 def broadcast(message: str):
     for (chat_id,) in Chat.select(Chat.chat_id).tuples():
-        bot.send_message(chat_id=chat_id, text=message, parse_mode=ParseMode.HTML)
+        try:
+            bot.send_message(chat_id=chat_id, text=message, parse_mode=ParseMode.HTML)
+        except TelegramError:
+            logging.exception(f"Error while sending message to {chat_id}: {message}")
 
 
 if __name__ == "__main__":
-    validate_socket()
 
     while True:
 
