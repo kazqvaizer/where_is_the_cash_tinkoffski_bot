@@ -1,0 +1,98 @@
+version: 2.1
+
+orbs:
+  docker: circleci/docker@1.0.1
+
+defaults: &defaults
+  resource_class: 'small'
+
+jobs:
+  lint:
+
+    <<: *defaults
+
+    docker:
+      - image: circleci/python:3.9
+
+    steps:
+
+      - checkout
+
+      - restore_cache:
+          key: deps-{{ checksum "src/requirements.txt" }}
+
+      - run:
+          name: install dependencies
+          command: |
+            python3 -m venv venv
+            . venv/bin/activate
+            pip install -r src/requirements.txt
+
+      - save_cache:
+          key: deps-{{ checksum "src/requirements.txt" }}
+          paths:
+            - "venv"
+
+      - run:
+          name: Create empty dot env file
+          command: touch src/.env
+
+      - run:
+          name: Linter
+          command: |
+            . venv/bin/activate
+            cd src && flake8
+
+      - persist_to_workspace:
+          root: .
+          paths:
+            - "venv"
+            - "src"
+            - ".circleci"
+
+  deploy:
+
+    <<: *defaults
+
+    docker:
+      - image: circleci/buildpack-deps:stretch
+
+    steps:
+
+      - attach_workspace:
+          at: .
+
+      - run:
+          name: Prepare ssh
+          command: |
+            mkdir -p ~/.ssh
+            cp .circleci/ssh_config ~/.ssh/config
+            cp .circleci/known_hosts ~/.ssh/
+
+      - run:
+          name: Deploy and wait
+          command: ssh prod "/srv/deploy-and-wait.sh tinkoff"
+
+workflows:
+  main:
+    jobs:
+      - lint_and_test
+      - docker/publish:
+          image: kazqvaizer/tinkoff
+          tag: latest,${CIRCLE_SHA1}
+          cache_from: kazqvaizer/tinkoff:latest
+          path: src
+          before_build:
+            - attach_workspace:
+                at: .
+          requires:
+            - lint
+          filters:
+            branches:
+              only: master
+      - deploy:
+          requires:
+            - docker/publish
+          filters:
+            branches:
+              only: master

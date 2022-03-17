@@ -1,0 +1,4 @@
+Host prod
+  HostName kazqvaizer.xyz
+  User circle
+  SendEnv CIRCLE_SHA1
