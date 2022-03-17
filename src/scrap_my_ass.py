@@ -1,4 +1,7 @@
 import logging
+import os
+import stat
+import time
 
 import requests
 import sentry_sdk
@@ -7,18 +10,26 @@ from telegram import Bot, ParseMode
 
 from models import CashRemain, Chat, db
 
+env.read_envfile()
+
 logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
-
-env.read_envfile()
-
 sentry_sdk.init(env("SENTRY_DSN", default=None))
 
 bot = Bot(token=env("TELEGRAM_BOT_TOKEN"))
-
+socket = env('DOCKER_SOCK', default='/var/run/docker.sock')
 currency = "USD"
+
+
+def validate_socket():
+    """Validate if we have access to the socket, die otherwise"""
+    mode = os.stat(socket).st_mode
+
+    assert stat.S_ISSOCK(mode)
+
+    logging.log(logging.DEBUG, socket)
 
 
 def get_clusters():
@@ -104,12 +115,18 @@ def broadcast(message: str):
 
 
 if __name__ == "__main__":
-    before = get_remains()
-    refill()
-    after = get_remains()
+    validate_socket()
 
-    if message := make_diff_message(before, after):
-        logging.log(logging.DEBUG, f"Broadcasting: {message}")
-        broadcast(message)
-    else:
-        logging.log(logging.DEBUG, "Nothing to broadcast")
+    while True:
+
+        before = get_remains()
+        refill()
+        after = get_remains()
+
+        if message := make_diff_message(before, after):
+            logging.log(logging.DEBUG, f"Broadcasting: {message}")
+            broadcast(message)
+        else:
+            logging.log(logging.DEBUG, "Nothing to broadcast")
+
+        time.sleep(120)
