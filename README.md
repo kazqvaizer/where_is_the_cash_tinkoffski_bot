@@ -7,3 +7,6 @@
 Пока что тут только Хабаровск.
 
 http://t.me/where_is_the_cash_tinkoffski_bot
+
+## Real time updates
+![image](https://user-images.githubusercontent.com/20068601/160285960-80057c88-0923-4b99-9421-8e4535135868.png)
