@@ -102,7 +102,7 @@ def broadcast(message: str):
         try:
             bot.send_message(chat_id=chat_id, text=message, parse_mode=ParseMode.HTML)
         except TelegramError:
-            logging.exception(f"Error while sending message to {chat_id}: {message}")
+            logging.error(f"Error while sending message to {chat_id}: {message}")
 
 
 if __name__ == "__main__":
